@@ -1,6 +1,7 @@
 package frc.robot.subsystems.vision;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -28,15 +29,10 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 public class Vision extends SubsystemBase{
     public final String camera1Name = "";
     public final String camera2Name = "";
-    SimCameraProperties cameraProp = new SimCameraProperties();
-    private final PhotonCamera camera1 = new PhotonCamera(camera1Name);
-    PhotonCameraSim camera1Sim = new PhotonCameraSim(camera1, cameraProp);
+    private final SimCameraProperties cameraProp = new SimCameraProperties();
+    public final CameraWrapper[] cameras = new CameraWrapper[2];
+    private final ArrayList<EstimatedRobotPose> poses = new ArrayList<>(this.cameras.length);
 
-    private final PhotonCamera camera2 = new PhotonCamera(camera2Name);
-    PhotonCameraSim camera2Sim = new PhotonCameraSim(camera2, cameraProp);
-
-    private final PhotonPoseEstimator camera1PoseEstimator;
-    private final PhotonPoseEstimator camera2PoseEstimator;
 
     VisionSystemSim visionSim = new VisionSystemSim("main");
 
@@ -47,15 +43,7 @@ public class Vision extends SubsystemBase{
 
     public Vision(){
         AprilTagFieldLayout fieldLayout = AprilTagFieldLayout.loadField(AprilTagFields.k2026RebuiltWelded);
-        this.camera1PoseEstimator = new PhotonPoseEstimator(fieldLayout, Transform3d.kZero);
-        this.camera2PoseEstimator = new PhotonPoseEstimator(fieldLayout, Transform3d.kZero);
-        try{
-            AprilTagFieldLayout tagLayout = AprilTagFieldLayout.loadFromResource(AprilTagFields.kDefaultField.m_resourceFile);
-            visionSim.addAprilTags(tagLayout);
-        }
-        catch(IOException e){
-            e.printStackTrace();
-        }
+        visionSim.addAprilTags(fieldLayout);
         
         // A 640 x 480 camera with a 100 degree diagonal FOV.
         cameraProp.setCalibration(640, 480, Rotation2d.fromDegrees(100));
@@ -74,9 +62,14 @@ public class Vision extends SubsystemBase{
         Rotation3d robotToCameraRot = new Rotation3d(0, Math.toRadians(-15), 0);
         Transform3d robotToCamera = new Transform3d(robotToCameraTrl, robotToCameraRot);
 
+        cameras[0] = new CameraWrapper(camera1Name, fieldLayout, robotToCamera, cameraProp);
+        cameras[1] = new CameraWrapper(camera2Name, fieldLayout, robotToCamera.plus(new Transform3d(1.0,0.5,0.5, new Rotation3d(0,0,Math.PI))), cameraProp);
+        
+
         // Add this camera to the vision system simulation with the given robot-to-camera transform.
-        visionSim.addCamera(camera1Sim, robotToCamera);
-        visionSim.addCamera(camera2Sim, robotToCamera.plus(new Transform3d(1.0,0.5,0.5, new Rotation3d()))); // shifting second camera relative position
+        for(CameraWrapper camera : this.cameras){
+            visionSim.addCamera(camera.cameraSim, camera.robotToCamera);
+        }
     }
 
     public Optional<EstimatedRobotPose> getLatestCameraPose(PhotonCamera camera, PhotonPoseEstimator poseEstimator){
@@ -97,19 +90,25 @@ public class Vision extends SubsystemBase{
         return latestPose;
     }
 
-    public Optional<EstimatedRobotPose> getLatestCamera1Pose(){
-        return getLatestCameraPose(camera1, this.camera1PoseEstimator);
-    }
+    public ArrayList<EstimatedRobotPose> getLatestPoses(){
+        this.poses.clear(); // very important to prevent old data from polluting arraylist
+        for(CameraWrapper camera : this.cameras){
+            Optional<EstimatedRobotPose> pose = camera.getLatestPose();
+            if(pose.isPresent()){
+                this.poses.add(pose.get());
+            }
+        }
 
-    public Optional<EstimatedRobotPose> getLatestCamera2Pose(){
-        return getLatestCameraPose(camera2, this.camera2PoseEstimator);
+        return this.poses;
     }
 
     public void updateHeadingData(){
         double timestamp = Timer.getFPGATimestamp();
         Rotation2d heading = this.headingSupplier.get();
-        this.camera1PoseEstimator.addHeadingData(timestamp, heading);
-        this.camera2PoseEstimator.addHeadingData(timestamp, heading);
+        
+        for(CameraWrapper camera : this.cameras){
+            camera.setHeading(heading, timestamp);
+        }
     }
 
     public void setSubsystemSuppliers(Supplier<Rotation2d> headingSupplier, Supplier<Pose2d> poseSupplier){
@@ -119,7 +118,6 @@ public class Vision extends SubsystemBase{
     }
 
     @Override
-
     public void periodic(){
         if(!hasSetSuppliers){
             DogLog.logFault("Vision Suppliers Not Called!");
@@ -132,11 +130,11 @@ public class Vision extends SubsystemBase{
         visionSim.update(this.poseSupplier.get());
         visionSim.getDebugField().getObject("setn postitio").setPose(this.poseSupplier.get());
         SmartDashboard.putData("Vision Field", this.visionSim.getDebugField());
-        Pose2d pose = this.poseSupplier.get();
     }
 
     public void setCameraDisable(boolean shouldDisable){
-        this.camera1.setDriverMode(shouldDisable);
-        this.camera2.setDriverMode(shouldDisable);
+        for(CameraWrapper camera : this.cameras){
+            camera.setCameraDisable(shouldDisable);
+        }
     }
 }
