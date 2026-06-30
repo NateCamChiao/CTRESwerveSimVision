@@ -37,7 +37,7 @@ public class CameraWrapper {
                 if(result.getTargets().size() == 1){
                     latestPose = poseEstimator.estimatePnpDistanceTrigSolvePose(result);
                 }
-                else{
+                else if(latestPose.isEmpty() || result.getTargets().size() >= 2){
                     latestPose = poseEstimator.estimateCoprocMultiTagPose(result);
                 }
             }

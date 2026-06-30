@@ -2,7 +2,10 @@ package frc.robot.subsystems;
 
 import static edu.wpi.first.units.Units.*;
 
+import java.util.ArrayList;
 import java.util.function.Supplier;
+
+import org.photonvision.EstimatedRobotPose;
 
 import com.ctre.phoenix6.SignalLogger;
 import com.ctre.phoenix6.Utils;
@@ -58,6 +61,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     private final SwerveRequest.SysIdSwerveSteerGains m_steerCharacterization = new SwerveRequest.SysIdSwerveSteerGains();
     private final SwerveRequest.SysIdSwerveRotation m_rotationCharacterization = new SwerveRequest.SysIdSwerveRotation();
     private final Field2d field = new Field2d();
+    private ArrayList<EstimatedRobotPose> visionPoses;
     // private final SwerveDrivePoseEstimator estimateWithNoise = new SwerveDrivePoseEstimator(null, kBlueAlliancePerspectiveRotation, null, null);
 
     /* SysId routine for characterizing translation. This is used to find PID gains for the drive motors. */
@@ -92,6 +96,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         )
     );
 
+
     /*
      * SysId routine for characterizing rotation.
      * This is used to find PID gains for the FieldCentricFacingAngle HeadingController.
@@ -122,6 +127,10 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     /* The SysId routine to test */
     private SysIdRoutine m_sysIdRoutineToApply = m_sysIdRoutineSteer;
 
+
+    // public void setSubsystemSuppliers(Supplier<ArrayList<EstimatedRobotPose>> robotPoseSupplier){
+    //     this.robotPoseSupplier = robotPoseSupplier;
+    // }
     /**
      * Constructs a CTRE SwerveDrivetrain using the specified constants.
      * <p>
@@ -288,6 +297,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
         field.setRobotPose(this.getState().Pose);
         SmartDashboard.putData("ctre pose", field);
+
+        
     }
 
     private void startSimThread() {

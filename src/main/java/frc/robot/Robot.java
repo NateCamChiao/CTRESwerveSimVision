@@ -28,21 +28,21 @@ public class Robot extends TimedRobot {
         vision = new Vision();
         swerve = new CommandSwerveDrivetrain(TunerConstants.DrivetrainConstants, TunerConstants.FrontLeft,
                 TunerConstants.FrontRight, TunerConstants.BackLeft, TunerConstants.BackRight);
-        vision.setSubsystemSuppliers(() -> swerve.getState().Pose.getRotation(), () -> swerve.getState().Pose);
+        vision.setSubsystemSuppliers(() -> swerve.getState().Pose.getRotation(), () -> swerve.getState().Pose, swerve::addVisionMeasurement);
 
         double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
         double MaxAngularRate = 3 / 2 * Math.PI;// 3/4 of a rotation per second max angular velocity
         SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
-            .withDeadband(MaxSpeed * 0.2).withRotationalDeadband(MaxAngularRate * 0.2) // Add a 20% deadband
-            .withDriveRequestType(DriveRequestType.OpenLoopVoltage); // Use open-loop control for drive motors
+                .withDeadband(MaxSpeed * 0.2).withRotationalDeadband(MaxAngularRate * 0.2) // Add a 20% deadband
+                .withDriveRequestType(DriveRequestType.OpenLoopVoltage); // Use open-loop control for drive motors
         swerve.setDefaultCommand(
-            // Drivetrain will execute this command periodically
-            swerve.applyRequest(() ->
-                drive.withVelocityX(-controller.getLeftY() * MaxSpeed) // Drive forward with negative Y (forward)
-                    .withVelocityY(-controller.getLeftX() * MaxSpeed) // Drive left with negative X (left)
-                    .withRotationalRate(-controller.getRightX() * MaxAngularRate*.5) // Drive counterclockwise with negative X (left)
-            )
-        );
+                // Drivetrain will execute this command periodically
+                swerve.applyRequest(() -> drive.withVelocityX(-controller.getLeftY() * MaxSpeed) // Drive forward with
+                                                                                                 // negative Y (forward)
+                        .withVelocityY(-controller.getLeftX() * MaxSpeed) // Drive left with negative X (left)
+                        .withRotationalRate(-controller.getRightX() * MaxAngularRate * .5) // Drive counterclockwise
+                                                                                           // with negative X (left)
+                ));
     }
 
     @Override
@@ -52,7 +52,7 @@ public class Robot extends TimedRobot {
 
     @Override
     public void disabledInit() {
-        this.vision.setCameraDisable(true);
+        this.vision.disableCameras(true);
     }
 
     @Override
@@ -61,7 +61,7 @@ public class Robot extends TimedRobot {
 
     @Override
     public void disabledExit() {
-        this.vision.setCameraDisable(false); // re-enable
+        this.vision.disableCameras(false); // re-enable
     }
 
     @Override
