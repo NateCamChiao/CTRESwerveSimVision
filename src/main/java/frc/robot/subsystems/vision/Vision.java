@@ -85,25 +85,6 @@ public class Vision extends SubsystemBase {
         }
     }
 
-    // public Optional<EstimatedRobotPose> getLatestCameraPose(PhotonCamera camera,
-    // PhotonPoseEstimator poseEstimator){
-    // Optional<EstimatedRobotPose> latestPose = Optional.empty();
-    // double latestTimestamp = 0;
-    // for(PhotonPipelineResult result: camera.getAllUnreadResults()){
-    // if(result.getTimestampSeconds() > latestTimestamp){
-    // latestTimestamp = result.getTimestampSeconds();
-
-    // if(result.getTargets().size() == 1){
-    // latestPose = poseEstimator.estimatePnpDistanceTrigSolvePose(result);
-    // }
-    // else{
-    // latestPose = poseEstimator.estimateCoprocMultiTagPose(result);
-    // }
-    // }
-    // }
-    // return latestPose;
-    // }
-
     public ArrayList<EstimatedRobotPose> getLatestPoses() {
         this.latestCameraPoses.clear(); // very important to prevent old data from polluting arraylist
         for (CameraWrapper camera : this.cameras) {
