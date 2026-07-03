@@ -33,13 +33,14 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Robot;
+import frc.robot.subsystems.vision.CameraWrapper.VisionMeasurement;
 
 public class Vision extends SubsystemBase {
     public final String camera1Name = "";
     public final String camera2Name = "";
     private final SimCameraProperties cameraProp = new SimCameraProperties();
     public final CameraWrapper[] cameras = new CameraWrapper[2];
-    private final ArrayList<EstimatedRobotPose> latestCameraPoses = new ArrayList<>(this.cameras.length);
+    private final ArrayList<VisionMeasurement> latestCameraPoses = new ArrayList<>(this.cameras.length);
 
     VisionSystemSim visionSim = new VisionSystemSim("main");
 
@@ -47,10 +48,11 @@ public class Vision extends SubsystemBase {
                                                                            // pointer exception
     private Supplier<Pose2d> poseSupplier = () -> Pose2d.kZero; // default zero pose
     private boolean hasSetSuppliers = false;
-    
-    private AddVisionMeasurementConsumer addVisionMeasurement;
+
+    private VisionMeasurementConsumer addVisionMeasurement;
+
     @FunctionalInterface
-    public static interface AddVisionMeasurementConsumer {
+    public static interface VisionMeasurementConsumer {
         public void accept(Pose2d estimatedPose, double timestamp, Matrix<N3, N1> estimatedStdDevs);
     }
 
@@ -67,12 +69,12 @@ public class Vision extends SubsystemBase {
         cameras[0] = new CameraWrapper(camera1Name, fieldLayout, robotToCamera, cameraProp);
         cameras[1] = new CameraWrapper(camera2Name, fieldLayout,
                 robotToCamera.plus(new Transform3d(1.0, 0.5, 0.5, new Rotation3d(0, 0, Math.PI))), cameraProp);
-        if(Robot.isSimulation()){
+        if (Robot.isSimulation()) {
             setupCameraSim(fieldLayout);
         }
     }
 
-    public void setupCameraSim(AprilTagFieldLayout fieldLayout){
+    public void setupCameraSim(AprilTagFieldLayout fieldLayout) {
         visionSim.addAprilTags(fieldLayout);
 
         // A 640 x 480 camera with a 100 degree diagonal FOV.
@@ -92,15 +94,15 @@ public class Vision extends SubsystemBase {
         for (CameraWrapper camera : this.cameras) {
             visionSim.addCamera(camera.cameraSim, camera.robotToCamera);
         }
-        
+
     }
 
-    public ArrayList<EstimatedRobotPose> getLatestPoses() {
+    public ArrayList<VisionMeasurement> getLatestPoses() {
         this.latestCameraPoses.clear(); // very important to prevent old data from polluting arraylist
         for (CameraWrapper camera : this.cameras) {
-            Optional<EstimatedRobotPose> pose = camera.getLatestPose();
-            if (pose.isPresent()) {
-                this.latestCameraPoses.add(pose.get());
+            Optional<VisionMeasurement> estimate = camera.getLatestPose();
+            if (estimate.isPresent()) {
+                this.latestCameraPoses.add(estimate.get());
             }
         }
 
@@ -110,13 +112,15 @@ public class Vision extends SubsystemBase {
     public void updateHeadingData() {
         double timestamp = Timer.getFPGATimestamp();
         Rotation2d heading = this.headingSupplier.get();
-
+        // call setHeading consistenty through periodic so camera can predict yaw
+        // (interpolation) and determine position using estimatePnpDistanceTrigSolvePose
         for (CameraWrapper camera : this.cameras) {
             camera.setHeading(heading, timestamp);
         }
     }
 
-    public void setSubsystemSuppliers(Supplier<Rotation2d> headingSupplier, Supplier<Pose2d> poseSupplier, AddVisionMeasurementConsumer visionMeasurementConsumer) {
+    public void setSubsystemSuppliers(Supplier<Rotation2d> headingSupplier, Supplier<Pose2d> poseSupplier,
+            VisionMeasurementConsumer visionMeasurementConsumer) {
         this.headingSupplier = headingSupplier;
         this.poseSupplier = poseSupplier;
         this.addVisionMeasurement = visionMeasurementConsumer;
@@ -129,8 +133,10 @@ public class Vision extends SubsystemBase {
             DogLog.logFault("Vision Suppliers Not Called!");
         }
         updateHeadingData();
-        for(EstimatedRobotPose estimate : this.getLatestPoses()){
-            // this.addVisionMeasurement.accept(estimate.estimatedPose.toPose2d(), estimate.timestampSeconds, VecBuilder.fill(0.5, 0.5, 0.5));
+        for (VisionMeasurement measurement : this.getLatestPoses()) {
+            this.addVisionMeasurement.accept(measurement.measurementInfo.estimatedPose.toPose2d(),
+                    measurement.measurementInfo.timestampSeconds,
+                    measurement.standardDeviations);
         }
     }
 
