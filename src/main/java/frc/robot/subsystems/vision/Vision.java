@@ -27,9 +27,12 @@ import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.RobotState;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Robot;
 
 public class Vision extends SubsystemBase {
     public final String camera1Name = "";
@@ -44,6 +47,7 @@ public class Vision extends SubsystemBase {
                                                                            // pointer exception
     private Supplier<Pose2d> poseSupplier = () -> Pose2d.kZero; // default zero pose
     private boolean hasSetSuppliers = false;
+    
     private AddVisionMeasurementConsumer addVisionMeasurement;
     @FunctionalInterface
     public static interface AddVisionMeasurementConsumer {
@@ -52,20 +56,6 @@ public class Vision extends SubsystemBase {
 
     public Vision() {
         AprilTagFieldLayout fieldLayout = AprilTagFieldLayout.loadField(AprilTagFields.k2026RebuiltWelded);
-        visionSim.addAprilTags(fieldLayout);
-
-        // A 640 x 480 camera with a 100 degree diagonal FOV.
-        cameraProp.setCalibration(640, 480, Rotation2d.fromDegrees(100));
-        // Approximate detection noise with average and standard deviation error in
-        // pixels.
-        cameraProp.setCalibError(0.25, 0.08);
-        // Set the camera image capture framerate (Note: this is limited by robot loop
-        // rate).
-        cameraProp.setFPS(20);
-        // The average and standard deviation in milliseconds of image data latency.
-        cameraProp.setAvgLatencyMs(35);
-        cameraProp.setLatencyStdDevMs(5);
-
         // Our camera is mounted 0.1 meters forward and 0.5 meters up from the robot
         // pose,
         // (Robot pose is considered the center of rotation at the floor level, or Z =
@@ -77,12 +67,32 @@ public class Vision extends SubsystemBase {
         cameras[0] = new CameraWrapper(camera1Name, fieldLayout, robotToCamera, cameraProp);
         cameras[1] = new CameraWrapper(camera2Name, fieldLayout,
                 robotToCamera.plus(new Transform3d(1.0, 0.5, 0.5, new Rotation3d(0, 0, Math.PI))), cameraProp);
+        if(Robot.isSimulation()){
+            setupCameraSim(fieldLayout);
+        }
+    }
+
+    public void setupCameraSim(AprilTagFieldLayout fieldLayout){
+        visionSim.addAprilTags(fieldLayout);
+
+        // A 640 x 480 camera with a 100 degree diagonal FOV.
+        cameraProp.setCalibration(640, 480, Rotation2d.fromDegrees(100));
+        // Approximate detection noise with average and standard deviation error in
+        // pixels.
+        cameraProp.setCalibError(0.25, 0.08);
+        // Set the camera image capture framerate (Note: this is limited by robot loop
+        // rate).
+        cameraProp.setFPS(20);
+        // The average and standard deviation in milliseconds of image data latency.
+        cameraProp.setAvgLatencyMs(100);
+        cameraProp.setLatencyStdDevMs(50);
 
         // Add this camera to the vision system simulation with the given
         // robot-to-camera transform.
         for (CameraWrapper camera : this.cameras) {
             visionSim.addCamera(camera.cameraSim, camera.robotToCamera);
         }
+        
     }
 
     public ArrayList<EstimatedRobotPose> getLatestPoses() {
@@ -120,7 +130,7 @@ public class Vision extends SubsystemBase {
         }
         updateHeadingData();
         for(EstimatedRobotPose estimate : this.getLatestPoses()){
-            this.addVisionMeasurement.accept(estimate.estimatedPose.toPose2d(), estimate.timestampSeconds, VecBuilder.fill(0.5, 0.5, 0.5));
+            // this.addVisionMeasurement.accept(estimate.estimatedPose.toPose2d(), estimate.timestampSeconds, VecBuilder.fill(0.5, 0.5, 0.5));
         }
     }
 
