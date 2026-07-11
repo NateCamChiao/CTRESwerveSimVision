@@ -1,15 +1,9 @@
 package frc.robot.subsystems.vision;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import org.photonvision.EstimatedRobotPose;
-import org.photonvision.PhotonCamera;
-import org.photonvision.PhotonPoseEstimator;
-import org.photonvision.PhotonPoseEstimator.PoseStrategy;
-import org.photonvision.simulation.PhotonCameraSim;
 import org.photonvision.simulation.SimCameraProperties;
 import org.photonvision.simulation.VisionSystemSim;
 import org.photonvision.targeting.PhotonPipelineResult;
@@ -36,8 +30,8 @@ import frc.robot.Robot;
 import frc.robot.subsystems.vision.CameraWrapper.VisionMeasurement;
 
 public class Vision extends SubsystemBase {
-    public final String camera1Name = "";
-    public final String camera2Name = "";
+    public final String camera1Name = "bob";
+    public final String camera2Name = "greg";
     private final SimCameraProperties cameraProp = new SimCameraProperties();
     public final CameraWrapper[] cameras = new CameraWrapper[2];
     private final ArrayList<VisionMeasurement> latestCameraPoses = new ArrayList<>(this.cameras.length);
@@ -68,7 +62,7 @@ public class Vision extends SubsystemBase {
         Transform3d robotToCamera = new Transform3d(robotToCameraTrl, robotToCameraRot);
         cameras[0] = new CameraWrapper(camera1Name, fieldLayout, robotToCamera, cameraProp);
         cameras[1] = new CameraWrapper(camera2Name, fieldLayout,
-                robotToCamera.plus(new Transform3d(1.0, 0.5, 0.5, new Rotation3d(0, 0, Math.PI))), cameraProp);
+                robotToCamera.plus(new Transform3d(0.5, 0.5, 0.5, new Rotation3d(0, 0, 0))), cameraProp);
         if (Robot.isSimulation()) {
             setupCameraSim(fieldLayout);
         }
@@ -76,7 +70,6 @@ public class Vision extends SubsystemBase {
 
     public void setupCameraSim(AprilTagFieldLayout fieldLayout) {
         visionSim.addAprilTags(fieldLayout);
-
         // A 640 x 480 camera with a 100 degree diagonal FOV.
         cameraProp.setCalibration(640, 480, Rotation2d.fromDegrees(100));
         // Approximate detection noise with average and standard deviation error in
@@ -87,20 +80,34 @@ public class Vision extends SubsystemBase {
         cameraProp.setFPS(20);
         // The average and standard deviation in milliseconds of image data latency.
         cameraProp.setAvgLatencyMs(100);
-        cameraProp.setLatencyStdDevMs(50);
+        cameraProp.setLatencyStdDevMs(20);
 
         // Add this camera to the vision system simulation with the given
         // robot-to-camera transform.
         for (CameraWrapper camera : this.cameras) {
             visionSim.addCamera(camera.cameraSim, camera.robotToCamera);
         }
-
+    }
+    // periodically called to add vision measurments to pose estimator
+    public void updateDrivetrainOdometry(){
+        DogLog.time("vision measurements");
+        for (CameraWrapper camera : this.cameras) {
+            Optional<VisionMeasurement> measurement = camera.getLatestUnreadMeasurement();
+            if (measurement.isPresent()) {
+                // call drivetrain vision measurement method and pass in data
+                this.addVisionMeasurement.accept(measurement.get().getMeasurementInfo().estimatedPose.toPose2d(),
+                    measurement.get().getMeasurementInfo().timestampSeconds,
+                    measurement.get().getStandardDeviations());
+            }
+        }
+        DogLog.timeEnd("vision measurements");
     }
 
+    // grab the latest position data from cameras
     public ArrayList<VisionMeasurement> getLatestPoses() {
         this.latestCameraPoses.clear(); // very important to prevent old data from polluting arraylist
         for (CameraWrapper camera : this.cameras) {
-            Optional<VisionMeasurement> estimate = camera.getLatestPose();
+            Optional<VisionMeasurement> estimate = camera.getLastMeasurement();
             if (estimate.isPresent()) {
                 this.latestCameraPoses.add(estimate.get());
             }
@@ -130,14 +137,12 @@ public class Vision extends SubsystemBase {
     @Override
     public void periodic() {
         if (!hasSetSuppliers) {
-            DogLog.logFault("Vision Suppliers Not Called!");
+            System.err.println("Vision Suppliers Not Called");
+            System.exit(1); // ends the program
+            // DogLog.logFault("Vision Suppliers Not Called!");
         }
         updateHeadingData();
-        for (VisionMeasurement measurement : this.getLatestPoses()) {
-            this.addVisionMeasurement.accept(measurement.measurementInfo.estimatedPose.toPose2d(),
-                    measurement.measurementInfo.timestampSeconds,
-                    measurement.standardDeviations);
-        }
+        updateDrivetrainOdometry();
     }
 
     @Override
