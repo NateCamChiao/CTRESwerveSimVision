@@ -10,9 +10,10 @@ import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.button.CommandJoystick;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
@@ -22,13 +23,14 @@ public class Robot extends TimedRobot {
     private Command m_autonomousCommand;
     private final Vision vision;
     private final CommandSwerveDrivetrain swerve;
-    private CommandXboxController controller = new CommandXboxController(0);
+    private CommandJoystick controller = new CommandJoystick(0);
 
     public Robot() {
         vision = new Vision();
         swerve = new CommandSwerveDrivetrain(TunerConstants.DrivetrainConstants, TunerConstants.FrontLeft,
                 TunerConstants.FrontRight, TunerConstants.BackLeft, TunerConstants.BackRight);
-        vision.setSubsystemSuppliers(() -> swerve.getState().Pose.getRotation(), () -> swerve.getState().Pose, swerve::addVisionMeasurement);
+        vision.setSubsystemSuppliers(() -> swerve.getState().Pose.getRotation(), () -> swerve.getDrivetrainPose(),
+                swerve::addVisionMeasurement);
 
         double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
         double MaxAngularRate = 3 / 2 * Math.PI;// 3/4 of a rotation per second max angular velocity
@@ -37,12 +39,14 @@ public class Robot extends TimedRobot {
                 .withDriveRequestType(DriveRequestType.OpenLoopVoltage); // Use open-loop control for drive motors
         swerve.setDefaultCommand(
                 // Drivetrain will execute this command periodically
-                swerve.applyRequest(() -> drive.withVelocityX(-controller.getLeftY() * MaxSpeed) // Drive forward with
+                swerve.applyRequest(() -> drive.withVelocityX(-controller.getRawAxis(1) * MaxSpeed) // Drive forward with
                                                                                                  // negative Y (forward)
-                        .withVelocityY(-controller.getLeftX() * MaxSpeed) // Drive left with negative X (left)
-                        .withRotationalRate(-controller.getRightX() * MaxAngularRate * .5) // Drive counterclockwise
+                        .withVelocityY(-controller.getRawAxis(0) * MaxSpeed) // Drive left with negative X (left)
+                        .withRotationalRate(-controller.getRawAxis(2) * MaxAngularRate * .5) // Drive counterclockwise
                                                                                            // with negative X (left)
                 ));
+        this.vision.disableCameras(true);
+
     }
 
     @Override
