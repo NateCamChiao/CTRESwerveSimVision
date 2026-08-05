@@ -85,14 +85,16 @@ public class CameraWrapper {
             // estimatedPose should get allocated to stack bc it doesn't escape the scope
             EstimatedRobotPose estimatedPose = poseEstimator.estimatePnpDistanceTrigSolvePose(latestResult).get(); 
 
-            this.mutableMeasurement.updateMeasurement(estimatedPose, 1, 1000);
+            double translationStdDevs = getPositionStandardDeviations(estimatedPose, latestResult);
+            this.mutableMeasurement.updateMeasurement(estimatedPose, translationStdDevs, 1000);
             return Optional.of(this.mutableMeasurement);
             // set rotation standard deviation very low to avoid feedback loop (since we use
             // gyro to help solve)
         } else if (latestResult.getTargets().size() >= 2 && latestResult.getMultiTagResult().isPresent()) {
             EstimatedRobotPose estimatedPose = poseEstimator.estimateCoprocMultiTagPose(latestResult).get();
 
-            this.mutableMeasurement.updateMeasurement(estimatedPose, 1, 1);
+            double translationStdDevs = getPositionStandardDeviations(estimatedPose, latestResult);
+            this.mutableMeasurement.updateMeasurement(estimatedPose, translationStdDevs, 1);
             return Optional.of(mutableMeasurement);
         }
         
