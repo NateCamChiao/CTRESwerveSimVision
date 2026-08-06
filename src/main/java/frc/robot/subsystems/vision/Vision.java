@@ -40,7 +40,10 @@ public class Vision extends SubsystemBase {
 
     private Supplier<Rotation2d> headingSupplier = () -> Rotation2d.kZero; // default value will be zero to prevent null
                                                                            // pointer exception
-    private Supplier<Pose2d> poseSupplier = () -> Pose2d.kZero; // default zero pose
+    // simulationPoseSupplier is used to get the "real" pose in simulation. The
+    // photonvision uses this to figure out what cameras see. This is different from
+    // the estimated pose that uses vision (using this would create a feedback loop)
+    private Supplier<Pose2d> simulationPoseSupplier = () -> Pose2d.kZero; // default zero pose
     private boolean hasSetSuppliers = false;
 
     private VisionMeasurementConsumer addVisionMeasurement;
@@ -88,16 +91,17 @@ public class Vision extends SubsystemBase {
             visionSim.addCamera(camera.cameraSim, camera.robotToCamera);
         }
     }
+
     // periodically called to add vision measurments to pose estimator
-    public void updateDrivetrainOdometry(){
+    public void updateDrivetrainOdometry() {
         DogLog.time("vision measurements");
         for (CameraWrapper camera : this.cameras) {
             Optional<VisionMeasurement> measurement = camera.getLatestUnreadMeasurement();
             if (measurement.isPresent()) {
                 // call drivetrain vision measurement method and pass in data
                 this.addVisionMeasurement.accept(measurement.get().getMeasurementInfo().estimatedPose.toPose2d(),
-                    measurement.get().getMeasurementInfo().timestampSeconds,
-                    measurement.get().getStandardDeviations());
+                        measurement.get().getMeasurementInfo().timestampSeconds,
+                        measurement.get().getStandardDeviations());
             }
         }
         DogLog.timeEnd("vision measurements");
@@ -126,10 +130,10 @@ public class Vision extends SubsystemBase {
         }
     }
 
-    public void setSubsystemSuppliers(Supplier<Rotation2d> headingSupplier, Supplier<Pose2d> poseSupplier,
+    public void setSubsystemSuppliers(Supplier<Rotation2d> headingSupplier, Supplier<Pose2d> simulationPoseSupplier,
             VisionMeasurementConsumer visionMeasurementConsumer) {
         this.headingSupplier = headingSupplier;
-        this.poseSupplier = poseSupplier;
+        this.simulationPoseSupplier = simulationPoseSupplier;
         this.addVisionMeasurement = visionMeasurementConsumer;
         this.hasSetSuppliers = true;
     }
@@ -147,8 +151,8 @@ public class Vision extends SubsystemBase {
 
     @Override
     public void simulationPeriodic() {
-        visionSim.update(this.poseSupplier.get());
-        visionSim.getDebugField().getObject("setn postitio").setPose(this.poseSupplier.get());
+        visionSim.update(this.simulationPoseSupplier.get());
+        visionSim.getDebugField().getObject("setn postitio").setPose(this.simulationPoseSupplier.get());
         SmartDashboard.putData("Vision Field", this.visionSim.getDebugField());
     }
 

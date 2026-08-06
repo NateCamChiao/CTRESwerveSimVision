@@ -29,7 +29,7 @@ public class Robot extends TimedRobot {
         vision = new Vision();
         swerve = new CommandSwerveDrivetrain(TunerConstants.DrivetrainConstants, TunerConstants.FrontLeft,
                 TunerConstants.FrontRight, TunerConstants.BackLeft, TunerConstants.BackRight);
-        vision.setSubsystemSuppliers(() -> swerve.getState().Pose.getRotation(), () -> swerve.getDrivetrainPose(),
+        vision.setSubsystemSuppliers(() -> swerve.getState().Pose.getRotation(), () -> swerve.getVisionlessDrivetrainPose(),
                 swerve::addVisionMeasurement);
 
         double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);

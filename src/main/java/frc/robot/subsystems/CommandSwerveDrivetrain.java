@@ -58,7 +58,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     private final SwerveRequest.SysIdSwerveRotation m_rotationCharacterization = new SwerveRequest.SysIdSwerveRotation();
     private final Field2d field = new Field2d();
 
-    // ONLY used for telling vision simulation our real, unaltered position. This is
+    // ONLY used for telling vision simulation our real position (not effected by vision measurements). This is
     // only used for simulation
     private final SwerveDriveOdometry unalteredOdometrySim = new SwerveDriveOdometry(getKinematics(),
             this.getState().RawHeading, this.getState().ModulePositions);
@@ -325,8 +325,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         this.unalteredOdometrySim.update(this.getState().RawHeading, this.getState().ModulePositions);
     }
 
-    public Pose2d getDrivetrainPose() {
-        return Robot.isSimulation() ? this.unalteredOdometrySim.getPoseMeters() : this.getState().Pose;
+    public Pose2d getVisionlessDrivetrainPose() {
+        return this.unalteredOdometrySim.getPoseMeters();
     }
 
     private void startSimThread() {
